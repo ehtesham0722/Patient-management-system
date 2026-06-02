@@ -1,0 +1,11 @@
+### POST REQUEST TO CREATE A NEW PATIENT
+POST http://localhost:4000/patients
+Content-Type: application/json
+
+{
+  "name": "Steven Philips",
+  "email": "stevi@123",
+  "address": "7th main 3rd cross",
+  "dateOfBirth" : "1995-08-22",
+  "registeredDate": "2024-11-15"
+}

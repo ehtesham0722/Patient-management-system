@@ -1,0 +1,10 @@
+### UPDATE PATIENT DETAILS
+PUT http://localhost:4000/patients/223e4567-e89b-12d3-a456-426614174009
+Content-Type: application/json
+
+{
+  "name": "Steven L Philips",
+  "email": "stevi@1234",
+  "address": "7th main 3rd cross",
+  "dateOfBirth" : "1995-08-22"
+}
