@@ -1,7 +1,7 @@
 -- Ensure the 'patient' table exists
 CREATE TABLE IF NOT EXISTS patient
 (
-    id              UUID PRIMARY KEY,
+    id              VARCHAR(36) PRIMARY KEY,
     name            VARCHAR(255)        NOT NULL,
     email           VARCHAR(255) UNIQUE NOT NULL,
     address         VARCHAR(255)        NOT NULL,

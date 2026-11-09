@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.pm</groupId>
-    <artifactId>Billing-service</artifactId>
+    <artifactId>billing-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Billing-service</name>
-    <description>Billing-service</description>
+    <name>billing-service</name>
+    <description>billing-service</description>
     <url/>
     <licenses>
         <license/>
@@ -73,8 +73,6 @@
             <artifactId>protobuf-java</artifactId>
             <version>4.29.1</version>
         </dependency>
-
-
     </dependencies>
 
 
