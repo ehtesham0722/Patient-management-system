@@ -1,15 +1,15 @@
 # Local Development & Environment Setup Guide
 
-This guide covers setting up your development environment, configuring IntelliJ IDEA, running services in Docker Compose, and troubleshooting common issues.
+This guide covers setting up your development environment, running all microservices via Docker Compose or locally via Maven, and troubleshooting common issues.
 
 ---
 
 ## 1. Environment Requirements
 
 * **Operating System**: Windows / macOS / Linux
-* **Java Development Kit (JDK)**: JDK 17 (recommended: Eclipse Temurin or Oracle JDK 17)
-* **Docker**: Docker Desktop with Linux containers enabled
-* **Build Tool**: Apache Maven 3.9+ (bundled Maven Wrapper `./mvnw` provided in repository root and each sub-module)
+* **Java Development Kit (JDK)**: JDK 17 (recommended: Eclipse Temurin 17)
+* **Docker**: Docker Desktop with Linux container support enabled
+* **Build Tool**: Apache Maven 3.9+ (bundled Maven Wrapper `./mvnw` provided)
 
 ---
 
@@ -17,121 +17,113 @@ This guide covers setting up your development environment, configuring IntelliJ 
 
 From the repository root:
 ```bash
-# Build and start MySQL, patient-service, and billing-service
+# Build and start all 5 microservices and 3 database/streaming containers
 docker compose up --build -d
 
-# View real-time logs
+# View real-time logs across all services
 docker compose logs -f
 
-# Stop all services
+# Stop and remove all containers and networks
 docker compose down
 ```
 
-### Services Started:
+### Services & Port Mappings:
 | Container Name | Internal Port | Host Port | Purpose |
 | :--- | :--- | :--- | :--- |
-| `patient-service-db` | `3306` | `3307` | MySQL 8.x database |
-| `kafka` | `9092` (internal), `9094` (host) | `9092`, `9094` | Apache Kafka (`apache/kafka:latest`) message broker (KRaft mode) |
-| `patient-service` | `4000` | `4000` | Patient REST API & Swagger UI |
-| `billing-service` | `4001`, `9001` | `4001`, `9001` | Billing gRPC Server & Web endpoint |
+| `api-gateway` | `4004` | `4004` | API Gateway entry point & route aggregator |
+| `auth-service` | `4005` | `4005` | Authentication & JWT token issuer |
+| `patient-service` | `4000` | `4000` | Patient CRUD REST API & gRPC client |
+| `billing-service` | `4001`, `9001` | `4001`, `9001` | Billing gRPC server & web endpoint |
+| `analytic-service` | `4002` | `4002` | Analytics Kafka consumer |
+| `kafka` | `9092` | `9092`, `9094` | Apache Kafka (KRaft mode) |
+| `patient-service-db` | `3306` | `3307` | MySQL 8 instance for patient data |
+| `auth-service-db` | `3306` | `3308` | MySQL 8 instance for user auth data |
 
 ---
 
 ## 3. Running Services Locally via Maven
 
-### 3.1 Start MySQL via Docker
+### 3.1 Start Infrastructure Containers (MySQL & Kafka)
 ```bash
-docker run -d \
-  --name patient-service-db \
-  --network internal \
-  -p 3307:3306 \
-  -e MYSQL_DATABASE=db \
-  -e MYSQL_ROOT_PASSWORD=password \
-  -e MYSQL_USER=admin_user \
-  -e MYSQL_PASSWORD=password \
-  mysql:latest
+docker compose up -d patient-service-db auth-service-db kafka
 ```
 
-### 3.2 Database Connection Details
-| Parameter | Value |
-| :--- | :--- |
-| **Driver** | MySQL |
-| **Host** | `localhost` |
-| **Port** | `3307` |
-| **User** | `admin_user` *(or `root`)* |
-| **Password** | `password` |
-| **Database** | `db` |
-| **JDBC URL** | `jdbc:mysql://localhost:3307/db` |
+### 3.2 Database Connection Summary
+| Database | Host | Host Port | Container Port | User | Password | Database Name |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Patient DB** | `localhost` | `3307` | `3306` | `admin_user` | `password` | `db` |
+| **Auth DB** | `localhost` | `3308` | `3306` | `admin_user` | `password` | `db` |
 
-### 3.3 Compile All Modules
-From the repository root:
+### 3.3 Build All Modules from Root
 ```bash
 ./mvnw clean compile
 ```
 
-### 3.4 Launch Each Service
-Open two separate terminal windows:
+### 3.4 Launch Each Microservice
+Run each command in a separate terminal:
 
-**Terminal 1: Patient Service**
-```bash
-cd patient-service
-./mvnw spring-boot:run
-```
-*(Listens on HTTP `http://localhost:4000`)*
+* **1. API Gateway (Port 4004)**:
+  ```bash
+  cd api-gateway
+  ./mvnw spring-boot:run
+  ```
 
-**Terminal 2: Billing Service**
-```bash
-cd billing-service
-./mvnw spring-boot:run
-```
-*(Listens on HTTP `4001` and gRPC `localhost:9001`)*
+* **2. Auth Service (Port 4005)**:
+  ```bash
+  cd auth-service
+  ./mvnw spring-boot:run
+  ```
 
----
+* **3. Patient Service (Port 4000)**:
+  ```bash
+  cd patient-service
+  ./mvnw spring-boot:run
+  ```
 
-## 4. IntelliJ IDEA Setup & Run Configurations
+* **4. Billing Service (Ports 4001 / 9001)**:
+  ```bash
+  cd billing-service
+  ./mvnw spring-boot:run
+  ```
 
-### 4.1 Importing the Project
-1. Open IntelliJ IDEA -> **File** -> **Open...**
-2. Select the repository root folder (`Patient-management-system`).
-3. Click the **Maven** tool window on the right -> Click **Reload All Maven Projects** (blue circular sync icon).
-4. Verify that:
-   * The root `patient-management-system` aggregator POM is loaded.
-   * Both `patient-service` and `billing-service` modules are recognized as child modules.
-   * In `billing-service`, `target/generated-sources/protobuf/java` and `grpc-java` are marked as **Generated Sources Root** (blue/brown folder icon).
-
-### 4.2 Pre-Configured Run Configurations
-Located in `.idea/workspace.xml`:
-* **`PatientServiceApplication`** (Spring Boot): Runs `patient-service` natively.
-* **`BillingServiceApplication`** (Spring Boot): Runs `billing-service` natively.
-* **`patient-service`** (Docker Deployment): Builds and runs `patient-service` container.
-* **`billing-service`** (Docker Deployment): Builds and runs `billing-service` container.
-* **`Patient-service-DB`** (Docker Deployment): Runs the MySQL container.
-* **HTTP Requests**: Located in `api-calls/patient-service/` for single-click execution in IntelliJ.
+* **5. Analytic Service (Port 4002)**:
+  ```bash
+  cd analytic-service
+  ./mvnw spring-boot:run
+  ```
 
 ---
 
-## 5. Troubleshooting Common Issues
+## 4. Troubleshooting & Common Pitfalls
 
-### Issue 1: `release version 21 not supported`
-* **Cause**: Trying to compile with `<java.version>21</java.version>` when JDK 17 is active.
-* **Fix**: Ensure `<java.version>17</java.version>` is set across all POM files and IntelliJ project SDK is set to 17.
+### 4.1 API Gateway Returning `404 Not Found`
+* **Cause 1 - Missing Route Prefix in YAML**: In Spring Cloud Gateway 5.x (`spring-cloud-starter-gateway-server-webflux`), routes must be nested under `spring.cloud.gateway.server.webflux.routes` (not just `spring.cloud.gateway.routes`).
+* **Cause 2 - Exact Path Matching**: In Spring WebFlux, `Path=/api/patients/**` does not match `/api/patients` without trailing slash. Predicates should declare both:
+  ```yaml
+  predicates:
+    - Path=/api/patients, /api/patients/**
+  ```
+* **Cause 3 - Double Slash in URL**: `http://localhost:4004//api/patients` fails path matching. Always use single slash: `http://localhost:4004/api/patients`.
 
-### Issue 2: `AbstractMethodError: Receiver class io.grpc.netty.shaded...`
-* **Cause**: gRPC version mismatch between Spring Boot's dependency management and explicitly imported `grpc-netty-shaded`.
-* **Fix**: Ensure `billing-service/pom.xml` uses `spring-boot-starter-parent` `3.4.0` (Spring Boot 3.x), which harmonizes with `net.devh:grpc-spring-boot-starter:3.1.0.RELEASE`.
+### 4.2 Auth Service: `Failed to load driver class com.mysql.cj.jdbc.Driver`
+* **Cause**: `auth-service/pom.xml` was generated with PostgreSQL driver rather than MySQL.
+* **Fix**: Replace `org.postgresql:postgresql` with:
+  ```xml
+  <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>runtime</scope>
+  </dependency>
+  ```
 
-### Issue 3: `failed to calculate checksum of ref ... "/pom.xml": not found`
-* **Cause**: Dockerfile context folder was set to a subfolder (`src/main`) instead of the service root.
-* **Fix**: Set context folder to `patient-service` (or `billing-service`) where `pom.xml` and `Dockerfile` reside.
+### 4.3 Auth Service: `Illegal base64 character 24` in `JwtUtil`
+* **Cause**: `@Value("${{jwt.secret}")` contained a double opening brace `${{`, causing Spring to inject the raw string `"${{jwt.secret}"`. The first character `$` (ASCII hex `0x24`) failed Base64 decoding.
+* **Fix**: Use `@Value("${jwt.secret:${JWT_SECRET:...}}")` and catch `IllegalArgumentException` in `JwtUtil` to support both Base64 and plain text secrets.
 
-### Issue 4: Docker Runner Stage Fails to Copy JAR
-* **Cause**: Case sensitivity mismatch between Linux Docker filesystem and Maven artifact name (e.g., `Billing-service` vs `billing-service`).
-* **Fix**: Standardized POM `<artifactId>billing-service</artifactId>` and Dockerfile `COPY --from=builder /app/target/billing-service-0.0.1-SNAPSHOT.jar ./app.jar`.
+### 4.4 MySQL `data.sql` Syntax Errors
+* **Cause**: PostgreSQL syntax (`id UUID PRIMARY KEY`, `"users"`) is invalid in MySQL.
+* **Fix**: Use `VARCHAR(36) PRIMARY KEY` and standard unquoted table names (`users`).
 
-### Issue 5: Protobuf Sources Not Generated During IntelliJ IDE Build
-* **Cause**: IntelliJ IDEA's native compiler (Javac / Build Project) does not execute Maven plugins by default.
-* **Fix**: 
-  1. In the Maven sidebar, expand `patient-service` ➔ `Plugins` ➔ `protobuf`.
-  2. Right-click `protobuf:compile` ➔ check **Execute Before Build**.
-  3. Right-click `protobuf:compile-custom` ➔ check **Execute Before Build**.
-  4. Or trigger manual generation via `patient-service` ➔ `Lifecycle` ➔ `compile`.
+### 4.5 Kafka Image 404 (`bitnami/kafka:latest`)
+* **Cause**: Bitnami deprecated/restricted public latest tags on Docker Hub.
+* **Fix**: Use the official Apache image: `apache/kafka:latest` in KRaft mode.

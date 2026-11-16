@@ -55,12 +55,14 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_SQL_INIT_MODE: always
       BILLING_SERVICE_ADDRESS: billing-service
-      BILLING_SERVICE_GRPC_PORT: 9091
+      BILLING_SERVICE_GRPC_PORT: 9001
       GRPC_CLIENT_BILLING_SERVICE_ADDRESS: static://billing-service:9001
       GRPC_CLIENT_BILLING_SERVICE_NEGOTIATION_TYPE: plaintext
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       - patient-service-db
       - billing-service
+      - kafka
 
   billing-service:
     build:
@@ -75,6 +77,68 @@ services:
     depends_on:
       - patient-service-db
 
+  analytic-service:
+    build:
+      context: ./analytic-service
+      dockerfile: Dockerfile
+    container_name: analytic-service
+    networks:
+      - internal
+    ports:
+      - "4002:4002"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - kafka
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    networks:
+      - internal
+    ports:
+      - "4004:4004"
+    environment:
+      PATIENT_SERVICE_URL: http://patient-service:4000
+    depends_on:
+      - patient-service
+
+  auth-service-db:
+    image: mysql:latest
+    container_name: auth-service-db
+    networks:
+      - internal
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_DATABASE: db
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_USER: admin_user
+      MYSQL_PASSWORD: password
+    volumes:
+      - auth-mysql-data:/var/lib/mysql
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    networks:
+      - internal
+    ports:
+      - "4005:4005"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://auth-service-db:3306/db
+      SPRING_DATASOURCE_USERNAME: admin_user
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_SQL_INIT_MODE: always
+      JWT_SECRET: dGhpc2lzYXZlcnlzZWNyZXRrZXlmb3Jqd3RhdXRoZW50aWNhdGlvbjEyMzQ1Njc4OTA=
+    depends_on:
+      - auth-service-db
+
 networks:
   internal:
     name: internal
@@ -83,3 +147,4 @@ networks:
 volumes:
   mysql-data:
   kafka-data:
+  auth-mysql-data:
